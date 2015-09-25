@@ -5,35 +5,61 @@ namespace Htmly;
 class Htmly {
 
 	protected $body = '';
+    protected $childBody = '';
+
+    private $excludeAttr = ['content', 'child'];
 
 	public function __call($name, $arguments)
     {
-        // Note: value of $name is case sensitive.
-        return dd( "Calling object method '$name' "
-             . implode(', ', $arguments). "\n");
+        if($name === 'print')
+        {
+            $toPrint = $this->body;
+            $this->body = '';
+            return $toPrint;
+        }
+        else{
+            $this->body .= $this->createTag($name, $arguments);
+            return $this;
+        }
     }
 
-    /**  As of PHP 5.3.0  */
     public static function __callStatic($name, $arguments)
     {
-        // Note: value of $name is case sensitive.
-
-		if(method_exists(self::class, '_'.$name)){
-            // $this->{$property} = $arguments[0];
-            $class = isset($arguments['class']) ? $arguments['class'] : null;
-            $content = isset($arguments['content']) ? $arguments['content'] : $arguments[0];
-
-            call_user_func(array(self::class, [$content, $class]));
+		if(is_array($arguments[0])){
+            return call_user_func(array(new self, 'createTag'), $name, $arguments);
         }else{
             $trace = debug_backtrace();
-            trigger_error('Undefined method  ' . $name . ' on line ' . $trace[0]['line'], E_USER_NOTICE);
+            trigger_error('Method ' . $name . ' must have an array as argument, on line ' . $trace[0]['line'], E_USER_NOTICE);
             return null;
         }
     }
 
-	public function _p($content, array $classes = null)
+	private function createTag($type, array $arguments)
 	{
-		$classes = !is_null($classes) ? implode(' ', $classes) : $classes;
-		return "<p class='$classes'>$content<p>";
+        $content = $arguments[0]['content'];
+        $insideContent = isset($arguments[0]['child']) ? $arguments[0]['child'] : '';
+        $attrs = $this->renderAttr($arguments[0]);
+
+        $openTag = "<$type $attrs>";
+        $closeTag = "</$type>";
+
+        return $openTag . $content . $insideContent . $closeTag;
 	}
+
+    private function renderAttr($arguments)
+    {
+        $attrs = '';
+        foreach ($arguments as $attrIdx => $value) {
+            if(!in_array($attrIdx, $this->excludeAttr))
+            {
+                $attrs .= $attrIdx . '="' . $this->buildAttr($attrIdx, $value) . '" ';
+            }
+        }
+        return $attrs;
+    }
+
+    private function buildAttr($type, $value)
+    {
+        return is_array($value) ? implode(' ', $value) : $value;
+    }
 }
